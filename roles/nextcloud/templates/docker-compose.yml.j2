@@ -1,0 +1,110 @@
+version: "3.9"
+
+secrets:
+  cloud_nextcloud_admin_password:
+    external: true
+  cloud_nextcloud_admin_user:
+    external: true
+  cloud_postgres_password:
+    external: true
+  cloud_postgres_user:
+    external: true
+
+services:
+  db:
+    image: postgres
+    restart: always
+    networks:
+      - ncloud_int
+    volumes:
+      - db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER_FILE=/run/secrets/cloud_postgres_user
+      - POSTGRES_PASSWORD_FILE=/run/secrets/cloud_postgres_password
+      - POSTGRES_DB={{ cloud_postgres_db }}
+    secrets:
+      - cloud_postgres_user
+      - cloud_postgres_password
+    deploy:
+      update_config:
+        parallelism: 1
+        max_failure_ratio: 0
+        failure_action: rollback
+
+  nextcloudredis:
+    image: redis:alpine
+    networks:
+      - ncloud_int
+    volumes:
+      - nextcloud_cache:/data
+    deploy:
+      update_config:
+        parallelism: 1
+        max_failure_ratio: 0
+        failure_action: rollback
+
+  cron:
+    image: nextcloud:production-fpm-alpine
+    volumes:
+      - nextcloud:/var/www/html
+    entrypoint: /cron.sh
+    networks:
+      - ncloud_int
+    deploy:
+      update_config:
+        parallelism: 1
+        max_failure_ratio: 0
+        failure_action: rollback
+
+  app:
+    image: nextcloud
+    restart: always
+    networks:
+      - ncloud_int
+      - { { EDGE_Network_Name } }
+    volumes:
+      - nextcloud:/var/www/html
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_DB={{ cloud_postgres_db }}
+      - POSTGRES_USER_FILE=/run/secrets/cloud_postgres_user
+      - POSTGRES_PASSWORD_FILE=/run/secrets/cloud_postgres_password
+      - NEXTCLOUD_ADMIN_PASSWORD_FILE=/run/secrets/cloud_nextcloud_admin_password
+      - NEXTCLOUD_ADMIN_USER_FILE=/run/secrets/cloud_nextcloud_admin_user
+      - NEXTCLOUD_TRUSTED_DOMAINS=cloud.{{ DOMAINNAME }}
+      - REDIS_HOST=nextcloudredis
+      - TRUSTED_PROXIES={{ EDGE_Network_Name }}
+    secrets:
+      - cloud_postgres_user
+      - cloud_postgres_password
+      - cloud_nextcloud_admin_password
+      - cloud_nextcloud_admin_user
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.nextcloud.entrypoints=websecure
+        - traefik.http.routers.nextcloud.rule=Host(`cloud.{{ DOMAINNAME }}`)
+        - traefik.http.routers.nextcloud.middlewares=nextcloud-redirregex,secheader@file
+        - traefik.http.routers.nextcloud.tls=true
+        - traefik.http.routers.nextcloud.tls.certresolver=myresolver
+        - traefik.http.services.nextcloud.loadbalancer.server.port=80
+        - traefik.docker.network={{ EDGE_Network_Name }}
+        - traefik.http.middlewares.nextcloud-redirregex.redirectregex.permanent=true
+        - traefik.http.middlewares.nextcloud-redirregex.redirectregex.regex=^https://(.*)/.well-known/(card|cal)dav
+        - traefik.http.middlewares.nextcloud-redirregex.redirectregex.replacement=https://$${1}/remote.php/dav/
+      update_config:
+        parallelism: 1
+        max_failure_ratio: 0
+        failure_action: rollback
+
+volumes:
+  db:
+  nextcloud:
+  nextcloud_cache:
+
+networks:
+  { { EDGE_Network_Name } }:
+    external: true
+    name: { { EDGE_Network_Name } }
+  ncloud_int:
+    driver: overlay

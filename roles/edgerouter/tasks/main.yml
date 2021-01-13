@@ -1,0 +1,3 @@
+---
+- name: Provision Traefik Router
+  include_tasks: edge_stack.yml

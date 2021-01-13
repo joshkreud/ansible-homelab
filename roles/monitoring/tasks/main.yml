@@ -1,0 +1,3 @@
+---
+- name: Provision Monitoring ELK Stack
+  include_tasks: elk_stack.yml

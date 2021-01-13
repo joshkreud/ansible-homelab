@@ -1,0 +1,51 @@
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+api:
+  dashboard: true
+  debug: false
+  insecure: true
+
+log:
+  level: warning
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+
+certificatesResolvers:
+  myresolver:
+    acme:
+      email: "{{ CERT_MAIL }}"
+      storage: /etc/traefik/acme/acme.json
+      httpChallenge:
+        entryPoint: web
+      caserver: https://acme-staging-v02.api.letsencrypt.org/directory
+
+accesslog:
+  filters:
+    statuscodes: 300-302,404,502,500
+    retryattempts: true
+    minduration: 10ms
+
+ping: null
+
+providers:
+  docker:
+    endpoint: "tcp://dockerproxy_traefik:2375"
+    watch: true
+    exposedbydefault: false
+    swarmMode: true
+    network: { { EDGE_Network_Name } }
+  file:
+    directory: /etc/traefik/config/
+    watch: true

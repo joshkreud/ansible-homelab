@@ -1,0 +1,65 @@
+---
+## Facts
+
+- name: Set Stack Name
+  ansible.builtin.set_fact:
+    stack_name: talaMonitor
+
+- name: Set Stack Folder
+  ansible.builtin.set_fact:
+    stack_folder: "/opt/{{ stack_name }}/"
+
+## Secrets
+
+- name: "{{ stack_name }}: Create Docker secret Elastic PW"
+  community.general.docker_secret:
+    name: Elastic_Password
+    data: "{{ Elastic_Password }}"
+    state: present
+
+# Ensure Data
+
+- name: "{{ stack_name }}: Create Folders"
+  ansible.builtin.file:
+    path: "{{ item }}/"
+    state: directory
+  loop:
+    - "{{ stack_folder }}"
+
+- name: "{{ stack_name }}: Template Compose file"
+  ansible.builtin.template:
+    src: "docker-compose.yml.j2"
+    dest: "{{ stack_folder }}/docker-compose.yml"
+
+- name: "{{ stack_name }}: Template Logstash Pipeline"
+  ansible.builtin.template:
+    src: "logstash.conf.j2"
+    dest: "{{ stack_folder }}/logstash.conf"
+
+- name: "{{ stack_name }}: Template Logstash Config"
+  ansible.builtin.template:
+    src: "logstash.yml.j2"
+    dest: "{{ stack_folder }}/logstash.yml"
+
+- name: "{{ stack_name }}: Template Kibana Config"
+  ansible.builtin.template:
+    src: "kibana.yml.j2"
+    dest: "{{ stack_folder }}/kibana.yml"
+
+- name: "{{ stack_name }}: Template Elasticsearch Config"
+  ansible.builtin.template:
+    src: "elasticsearch.yml.j2"
+    dest: "{{ stack_folder }}/elasticsearch.yml"
+
+- name: add a vm.max_map_count=262144 setting at the end of the sysctl.conf
+  sysctl: name=vm.max_map_count value=262144 state=present reload=yes
+
+## Deploy Stack
+
+- name: "{{ stack_name }}: Create and start Stack"
+  community.general.docker_stack:
+    state: present
+    name: "{{ stack_name }}"
+    prune: yes
+    compose:
+      - "{{ stack_folder }}/docker-compose.yml"

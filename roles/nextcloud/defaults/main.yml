@@ -1,0 +1,6 @@
+cloud_postgres_db: "nextcloud"
+cloud_postgres_user: "nextcloud"
+cloud_nextcloud_admin_user: "sysop"
+cloud_nextcloud_admin_password: "supersecret" #! Password
+cloud_postgres_password: "superdupersecret" #! Password
+EDGE_Network_Subnet: 172.0.0.1/24

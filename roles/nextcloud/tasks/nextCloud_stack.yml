@@ -1,0 +1,60 @@
+---
+## Facts
+
+- name: Set Stack Name
+  ansible.builtin.set_fact:
+    stack_name: talaCloud
+
+- name: Set Stack Folder
+  ansible.builtin.set_fact:
+    stack_folder: "/opt/{{ stack_name }}/"
+
+## Secrets
+
+- name: "{{ stack_name }}: Create Docker secret NextCloud Admin"
+  community.general.docker_secret:
+    name: cloud_nextcloud_admin_user
+    data: "{{ cloud_nextcloud_admin_user }}"
+    state: present
+
+- name: "{{ stack_name }}: Create Docker secret NextCloud Admin PW"
+  community.general.docker_secret:
+    name: cloud_nextcloud_admin_password
+    data: "{{ cloud_nextcloud_admin_password }}"
+    state: present
+
+- name: "{{ stack_name }}: Create Docker secret postgres password"
+  community.general.docker_secret:
+    name: cloud_postgres_password
+    data: "{{ cloud_postgres_password }}"
+    state: present
+
+- name: "{{ stack_name }}: Create Docker secret postgres user"
+  community.general.docker_secret:
+    name: cloud_postgres_user
+    data: "{{ cloud_postgres_user }}"
+    state: present
+
+# Ensure Data
+
+- name: "{{ stack_name }}: Create Folders"
+  ansible.builtin.file:
+    path: "{{ item }}/"
+    state: directory
+  loop:
+    - "{{ stack_folder }}"
+
+- name: "{{ stack_name }}: Template Compose file"
+  ansible.builtin.template:
+    src: "docker-compose.yml.j2"
+    dest: "{{ stack_folder }}/docker-compose.yml"
+
+## Deploy Stack
+
+- name: "{{ stack_name }}: Create and start Stack"
+  community.general.docker_stack:
+    state: present
+    name: "{{ stack_name }}"
+    prune: yes
+    compose:
+      - "{{ stack_folder }}/docker-compose.yml"

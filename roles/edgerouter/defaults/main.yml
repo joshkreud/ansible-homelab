@@ -1,0 +1,11 @@
+DOMAINNAME: localhost
+CERT_MAIL: "admin@{{ DOMAINNAME }}"
+gateway_volume_path: /opt/edgerouter/volumes
+prune_docker: no
+TIME_ZONE: Europe/Berlin
+EDGE_Network_Name: "edge"
+
+gateway_authelia_redis_pw: "veryrandomsecret" #! Password
+gateway_authelia_session_token: "veryrandomsecret" #! Password
+gateway_authelia_jwt_token: "veryrandomsecret" #! Password
+gateway_postgres_db_password: "superduperrandom" #! Password

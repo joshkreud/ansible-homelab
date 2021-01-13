@@ -1,0 +1,3 @@
+---
+- name: Provision NextCloud
+  include_tasks: nextCloud_stack.yml

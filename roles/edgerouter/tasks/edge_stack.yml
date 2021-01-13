@@ -1,0 +1,102 @@
+---
+## Facts
+
+- name: Set Stack Name
+  ansible.builtin.set_fact:
+    stack_name: talaGateway
+
+- name: "{{ stack_name }}:Set Stack Folder"
+  ansible.builtin.set_fact:
+    stack_folder: "/opt/"
+
+## Secrets
+
+- name: "{{ stack_name }}: Create Docker secret RedisPW"
+  community.general.docker_secret:
+    name: authelia_redis_password
+    data: "{{ gateway_authelia_redis_pw }}"
+    state: present
+
+- name: "{{ stack_name }}: Create Docker secret JWT"
+  community.general.docker_secret:
+    name: authelia_jwt
+    data: "{{ gateway_authelia_jwt_token }}"
+    state: present
+
+- name: "{{ stack_name }}: Create Docker secret session token"
+  community.general.docker_secret:
+    name: authelia_session
+    data: "{{ gateway_authelia_session_token }}"
+    state: present
+
+- name: "{{ stack_name }}: Create Docker secret postgres pw"
+  community.general.docker_secret:
+    name: gateway_postgres_db_password
+    data: "{{ gateway_postgres_db_password }}"
+    state: present
+
+# Ensure Data
+
+- name: "{{ stack_name }}: Create Folders"
+  ansible.builtin.file:
+    path: "{{ item }}/"
+    state: directory
+  loop:
+    - "{{ stack_folder }}"
+    - "{{ gateway_volume_path }}/traefik/acme/"
+    - "{{ gateway_volume_path }}/traefik/config/"
+    - "{{ gateway_volume_path }}/traefik/logs/"
+    - "{{ gateway_volume_path }}/redis/data/"
+    - "{{ gateway_volume_path }}/authelia/config/"
+    - "{{ gateway_volume_path }}/postgres/data/"
+
+- name: "{{ stack_name }}: Template Compose file"
+  ansible.builtin.template:
+    src: "docker-compose.yml.j2"
+    dest: "{{ stack_folder }}/docker-compose.yml"
+
+- name: "{{ stack_name }}: Template Authelia Config"
+  ansible.builtin.template:
+    src: "authelia-conf.yml.j2"
+    dest: "{{ gateway_volume_path }}/authelia/config/configuration.yml"
+
+- name: "{{ stack_name }}: Template Authelia Development User Database"
+  ansible.builtin.template:
+    src: "authelia-DevUserDB.yml.j2"
+    dest: "{{ gateway_volume_path }}/authelia/config/users_database.yml"
+
+- name: "{{ stack_name }}: Template Redis Config"
+  ansible.builtin.template:
+    src: "redis.conf.j2"
+    dest: "{{ gateway_volume_path }}/redis/redis.conf"
+
+- name: "{{ stack_name }}: Template Traefik Static Config"
+  ansible.builtin.template:
+    src: "traefik.yml.j2"
+    dest: "{{ gateway_volume_path }}/traefik/traefik.yml"
+
+- name: "{{ stack_name }}: Template Traefik Dynamic Config"
+  ansible.builtin.template:
+    src: "traefik_dynamic.yml.j2"
+    dest: "{{ gateway_volume_path }}/traefik/config/dynamic_conf.yml"
+
+## Deploy Stack
+
+- name: Create Edge Network
+  community.general.docker_network:
+    name: "{{ EDGE_Network_Name }}"
+    driver: overlay
+    attachable: yes
+  register: EDGE_Network
+
+- name: Set Subnet as Facts
+  ansible.builtin.set_fact:
+    EDGE_Network_Subnet: "{{ EDGE_Network.network.IPAM.Config[0].Subnet }}"
+
+- name: "{{ stack_name }}: Create and start Stack"
+  community.general.docker_stack:
+    state: present
+    name: "{{ stack_name }}"
+    prune: yes
+    compose:
+      - "{{ stack_folder }}/docker-compose.yml"
