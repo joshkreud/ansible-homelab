@@ -24,9 +24,6 @@ platforms:
       - network_name: forwarded_port
         guest: 443
         host: 8043
-      - network_name: forwarded_port
-        guest: 2375
-        host: 2375
 
 provisioner:
   name: ansible
