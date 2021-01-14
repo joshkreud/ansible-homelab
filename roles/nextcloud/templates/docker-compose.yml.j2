@@ -61,7 +61,7 @@ services:
     restart: always
     networks:
       - ncloud_int
-      - { { EDGE_Network_Name } }
+      - {{ EDGE_Network_Name }}
     volumes:
       - nextcloud:/var/www/html
     environment:
@@ -103,8 +103,8 @@ volumes:
   nextcloud_cache:
 
 networks:
-  { { EDGE_Network_Name } }:
+  {{ EDGE_Network_Name }}:
     external: true
-    name: { { EDGE_Network_Name } }
+    name: {{ EDGE_Network_Name }}
   ncloud_int:
     driver: overlay

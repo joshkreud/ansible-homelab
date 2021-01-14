@@ -3,7 +3,7 @@
 
 - name: Set Stack Name
   ansible.builtin.set_fact:
-    stack_name: talaGateway
+    stack_name: edgerouter
 
 - name: "{{ stack_name }}:Set Stack Folder"
   ansible.builtin.set_fact:

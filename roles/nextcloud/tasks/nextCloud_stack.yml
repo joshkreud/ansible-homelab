@@ -3,7 +3,7 @@
 
 - name: Set Stack Name
   ansible.builtin.set_fact:
-    stack_name: talaCloud
+    stack_name: nextcloud
 
 - name: Set Stack Folder
   ansible.builtin.set_fact:
