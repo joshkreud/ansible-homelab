@@ -26,7 +26,7 @@ pipenv shell
 
 Testing is done with Molecule.
 Molecule check will Create a VM and deploy a Dev server.
-Make sure to overwrite default Variables like the Domainname in [converge.yml](./molecule/default/converge.yml)
+Make sure to overwrite default Variables like the Domainname.
 
 ```bash
 sudo apt install virtualbox vagrant
@@ -35,3 +35,8 @@ sudo ./molecule/default/forwardports.sh # forwards 80 and 443 of Host to 8080 an
 molecule converge # To Create and Provision the deployment
 molecule login # To ssh into the VM
 ```
+
+
+## Speed up Testing
+
+You can temporarily comment out roles in [main.yml](./main.yml).

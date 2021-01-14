@@ -31,8 +31,8 @@
 
 - name: "{{ stack_name }}: Create Docker secret postgres pw"
   community.general.docker_secret:
-    name: gateway_postgres_db_password
-    data: "{{ gateway_postgres_db_password }}"
+    name: auehtlia_postgres_pw
+    data: "{{ auehtlia_postgres_pw }}"
     state: present
 
 # Ensure Data
@@ -43,12 +43,12 @@
     state: directory
   loop:
     - "{{ stack_folder }}"
-    - "{{ gateway_volume_path }}/traefik/acme/"
-    - "{{ gateway_volume_path }}/traefik/config/"
-    - "{{ gateway_volume_path }}/traefik/logs/"
-    - "{{ gateway_volume_path }}/redis/data/"
-    - "{{ gateway_volume_path }}/authelia/config/"
-    - "{{ gateway_volume_path }}/postgres/data/"
+    - "{{ edgerouter_volume_path }}/traefik/acme/"
+    - "{{ edgerouter_volume_path }}/traefik/config/"
+    - "{{ edgerouter_volume_path }}/traefik/logs/"
+    - "{{ edgerouter_volume_path }}/redis/data/"
+    - "{{ edgerouter_volume_path }}/authelia/config/"
+    - "{{ edgerouter_volume_path }}/postgres/data/"
 
 - name: "{{ stack_name }}: Template Compose file"
   ansible.builtin.template:
@@ -58,27 +58,27 @@
 - name: "{{ stack_name }}: Template Authelia Config"
   ansible.builtin.template:
     src: "authelia-conf.yml.j2"
-    dest: "{{ gateway_volume_path }}/authelia/config/configuration.yml"
+    dest: "{{ edgerouter_volume_path }}/authelia/config/configuration.yml"
 
 - name: "{{ stack_name }}: Template Authelia Development User Database"
   ansible.builtin.template:
     src: "authelia-DevUserDB.yml.j2"
-    dest: "{{ gateway_volume_path }}/authelia/config/users_database.yml"
+    dest: "{{ edgerouter_volume_path }}/authelia/config/users_database.yml"
 
 - name: "{{ stack_name }}: Template Redis Config"
   ansible.builtin.template:
     src: "redis.conf.j2"
-    dest: "{{ gateway_volume_path }}/redis/redis.conf"
+    dest: "{{ edgerouter_volume_path }}/redis/redis.conf"
 
 - name: "{{ stack_name }}: Template Traefik Static Config"
   ansible.builtin.template:
     src: "traefik.yml.j2"
-    dest: "{{ gateway_volume_path }}/traefik/traefik.yml"
+    dest: "{{ edgerouter_volume_path }}/traefik/traefik.yml"
 
 - name: "{{ stack_name }}: Template Traefik Dynamic Config"
   ansible.builtin.template:
     src: "traefik_dynamic.yml.j2"
-    dest: "{{ gateway_volume_path }}/traefik/config/dynamic_conf.yml"
+    dest: "{{ edgerouter_volume_path }}/traefik/config/dynamic_conf.yml"
 
 ## Deploy Stack
 

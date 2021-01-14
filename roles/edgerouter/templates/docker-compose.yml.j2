@@ -7,7 +7,7 @@ secrets:
     external: true
   authelia_session:
     external: true
-  gateway_postgres_db_password:
+  auehtlia_postgres_pw:
     external: true
 
 services:
@@ -18,16 +18,16 @@ services:
       - authelia_jwt
       - authelia_session
       - authelia_redis_password
-      - gateway_postgres_db_password
+      - auehtlia_postgres_pw
     volumes:
-      - {{ gateway_volume_path }}/authelia/config:/config
+      - {{ edgerouter_volume_path }}/authelia/config:/config
     networks:
       - traefik_int
     environment:
       - AUTHELIA_JWT_SECRET_FILE=/run/secrets/authelia_jwt
       - AUTHELIA_SESSION_SECRET_FILE=/run/secrets/authelia_session
       - AUTHELIA_SESSION_REDIS_PASSWORD_FILE=/run/secrets/authelia_redis_password
-      - AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE=/run/secrets/gateway_postgres_db_password
+      - AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE=/run/secrets/auehtlia_postgres_pw
       - "TZ={{ TIME_ZONE }}"
     deploy:
       update_config:
@@ -41,18 +41,19 @@ services:
         - traefik.http.routers.authelia.tls=true
         - traefik.http.routers.authelia.tls.certresolver=myresolver
         - traefik.http.routers.authelia.middlewares=secheader@file
-        - traefik.http.services.authelia.loadbalancer.server.port=80 #9091
+        - traefik.http.services.authelia.loadbalancer.server.port=9091 #9091
+        - "traefik.docker.network={{ stack_name }}_traefik_int"
 
   authelia_postgres:
     image: postgres
     secrets:
-      - gateway_postgres_db_password
+      - auehtlia_postgres_pw
     networks:
       - traefik_int
     volumes:
-      - {{ gateway_volume_path }}/postgres/data:/var/lib/postgresql/data
+      - {{ edgerouter_volume_path }}/postgres/data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_PASSWORD_FILE=/run/secrets/gateway_postgres_db_password
+      - POSTGRES_PASSWORD_FILE=/run/secrets/auehtlia_postgres_pw
       - POSTGRES_USER=authelia
       - "TZ={{ TIME_ZONE }}"
     deploy:
@@ -67,8 +68,8 @@ services:
     secrets:
       - authelia_redis_password
     volumes:
-      - {{ gateway_volume_path }}/redis/data:/redis_data
-      - {{ gateway_volume_path }}/redis/redis.conf:/usr/local/etc/redis/redis.conf
+      - {{ edgerouter_volume_path }}/redis/data:/redis_data
+      - {{ edgerouter_volume_path }}/redis/redis.conf:/usr/local/etc/redis/redis.conf
     command:
       [
         "sh",
@@ -116,7 +117,7 @@ services:
         'max-size': '10m'
         'max-file': '5'
     volumes:
-      - "{{ gateway_volume_path }}/traefik/:/etc/traefik/"
+      - "{{ edgerouter_volume_path }}/traefik/:/etc/traefik/"
     ports:
       - "80:80"
       - "443:443"
@@ -142,6 +143,7 @@ services:
         - traefik.http.routers.traefik-local.service=api@internal
         - traefik.http.routers.traefik-local.middlewares=authelia@file,secheader@file
         - traefik.http.routers.traefik-local.tls=true
+        - traefik.docker.network={{ EDGE_Network_Name }}
         - traefik.http.routers.traefik-local.tls.certresolver=myresolver
         - traefik.http.services.traefik-local.loadbalancer.server.port=8080
         - traefik.http.services.traefik-local.loadbalancer.server.scheme=http

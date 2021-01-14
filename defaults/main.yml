@@ -1,3 +1,4 @@
 # key: value
 TIME_ZONE: Europe/Berlin
 EDGE_Network_Name: edge
+DOMAINNAME: localhost

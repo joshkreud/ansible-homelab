@@ -3,34 +3,9 @@
   hosts: all
   become: true
 
-  roles:
-    - role: mmannerm.bash_it #Install Bash-it for nicer bash in the VM
-      user: vagrant
-      theme: Powerline
-      aliases:
-        - general
-        - ansible
-        - docker
-        - docker-compose
-      plugins:
-        - history
-        - docker
-        - dirs
-        - docker-compose
-        - docker
-        - xterm
-        - sudo
-      completions:
-        - git
-        - system
-        - defaults
-        - docker-compose
-        - docker
-        - docker-machine
-
 - import_playbook: ../../main.yml
   vars:
     docker_users:
       - vagrant
     # prune_docker: true
-    DOMAINNAME: maclab.intra
+    DOMAINNAME: maclab
