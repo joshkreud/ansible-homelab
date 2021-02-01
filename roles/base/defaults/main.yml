@@ -1,2 +1,3 @@
 TIME_ZONE: Europe/Berlin
 prune_docker: no
+hostname_loopback: yes

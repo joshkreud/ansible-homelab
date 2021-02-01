@@ -1,92 +1,77 @@
 ---
 ## Facts
-
 - name: Set Stack Name
   ansible.builtin.set_fact:
     stack_name: edgerouter
 
-- name: "{{ stack_name }}:Set Stack Folder"
+- name: "{{ stack_name }}: Set Stack Folder"
   ansible.builtin.set_fact:
-    stack_folder: "/opt/"
+    stack_folder: "/opt/{{ stack_name }}"
 
-## Secrets
+- name: "{{ stack_name }}: Set Stack Volume Folder"
+  ansible.builtin.set_fact:
+    stack_volume_folder: "{{ stack_folder }}/volumes"
 
-- name: "{{ stack_name }}: Create Docker secret RedisPW"
-  community.general.docker_secret:
-    name: authelia_redis_password
-    data: "{{ gateway_authelia_redis_pw }}"
-    state: present
-
-- name: "{{ stack_name }}: Create Docker secret JWT"
-  community.general.docker_secret:
-    name: authelia_jwt
-    data: "{{ gateway_authelia_jwt_token }}"
-    state: present
-
-- name: "{{ stack_name }}: Create Docker secret session token"
-  community.general.docker_secret:
-    name: authelia_session
-    data: "{{ gateway_authelia_session_token }}"
-    state: present
-
-- name: "{{ stack_name }}: Create Docker secret postgres pw"
-  community.general.docker_secret:
-    name: auehtlia_postgres_pw
-    data: "{{ auehtlia_postgres_pw }}"
-    state: present
-
-# Ensure Data
-
+# Ensure Folders
 - name: "{{ stack_name }}: Create Folders"
   ansible.builtin.file:
     path: "{{ item }}/"
     state: directory
   loop:
-    - "{{ stack_folder }}"
-    - "{{ edgerouter_volume_path }}/traefik/acme/"
-    - "{{ edgerouter_volume_path }}/traefik/config/"
-    - "{{ edgerouter_volume_path }}/traefik/logs/"
-    - "{{ edgerouter_volume_path }}/redis/data/"
-    - "{{ edgerouter_volume_path }}/authelia/config/"
-    - "{{ edgerouter_volume_path }}/postgres/data/"
+    - "{{ stack_folder }}/secrets/"
+    - "{{ stack_volume_folder }}/traefik/acme/"
+    - "{{ stack_volume_folder }}/traefik/config/"
+    - "{{ stack_volume_folder }}/traefik/logs/"
+    - "{{ stack_volume_folder }}/postgres/data/"
+    - "{{ stack_volume_folder }}/keycloak/"
 
+## Secrets
+- name: "{{ stack_name }}: Create Docker secret Keycloak User"
+  ansible.builtin.lineinfile:
+    path: "{{ stack_folder }}/secrets/keycloak_user"
+    line: "{{ keycloak_user }}"
+    state: present
+    owner: root
+    group: root
+    mode: '0600'
+    create: yes
+
+- name: "{{ stack_name }}: Create Docker secret Keycloak Password"
+  ansible.builtin.lineinfile:
+    path: "{{ stack_folder }}/secrets/keycloak_password"
+    line: "{{ keycloak_password }}"
+    state: present
+    owner: root
+    group: root
+    mode: '0600'
+    create: yes
+
+- name: "{{ stack_name }}: Create Docker secret postgres pw"
+  ansible.builtin.lineinfile:
+    path: "{{ stack_folder }}/secrets/keycloak_postgres_pw"
+    line: "{{ keycloak_postgres_pw }}"
+    state: present
+    owner: root
+    group: root
+    mode: '0600'
+    create: yes
+
+# Compose File
 - name: "{{ stack_name }}: Template Compose file"
   ansible.builtin.template:
     src: "docker-compose.yml.j2"
     dest: "{{ stack_folder }}/docker-compose.yml"
 
-- name: "{{ stack_name }}: Template Authelia Config"
-  ansible.builtin.template:
-    src: "authelia-conf.yml.j2"
-    dest: "{{ edgerouter_volume_path }}/authelia/config/configuration.yml"
-
-- name: "{{ stack_name }}: Template Authelia Development User Database"
-  ansible.builtin.template:
-    src: "authelia-DevUserDB.yml.j2"
-    dest: "{{ edgerouter_volume_path }}/authelia/config/users_database.yml"
-
-- name: "{{ stack_name }}: Template Redis Config"
-  ansible.builtin.template:
-    src: "redis.conf.j2"
-    dest: "{{ edgerouter_volume_path }}/redis/redis.conf"
-
-- name: "{{ stack_name }}: Template Traefik Static Config"
-  ansible.builtin.template:
-    src: "traefik.yml.j2"
-    dest: "{{ edgerouter_volume_path }}/traefik/traefik.yml"
-
 - name: "{{ stack_name }}: Template Traefik Dynamic Config"
   ansible.builtin.template:
     src: "traefik_dynamic.yml.j2"
-    dest: "{{ edgerouter_volume_path }}/traefik/config/dynamic_conf.yml"
+    dest: "{{ stack_volume_folder }}/traefik/config/dynamic_conf.yml"
 
 ## Deploy Stack
-
 - name: Create Edge Network
   community.general.docker_network:
     name: "{{ EDGE_Network_Name }}"
-    driver: overlay
-    attachable: yes
+    driver: bridge
   register: EDGE_Network
 
 - name: Set Subnet as Facts
@@ -94,9 +79,7 @@
     EDGE_Network_Subnet: "{{ EDGE_Network.network.IPAM.Config[0].Subnet }}"
 
 - name: "{{ stack_name }}: Create and start Stack"
-  community.general.docker_stack:
+  community.general.docker_compose:
     state: present
-    name: "{{ stack_name }}"
-    prune: yes
-    compose:
-      - "{{ stack_folder }}/docker-compose.yml"
+    project_name: "{{ stack_name }}"
+    project_src: "{{ stack_folder }}"

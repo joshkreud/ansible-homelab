@@ -3,26 +3,28 @@ http:
     secheader:
       headers:
         browserXssFilter: true
-        contentTypeNosniff: true
-        frameDeny: true
-        sslRedirect: true
-        stsIncludeSubdomains: true
-        stsPreload: true
-        stsSeconds: 31536000
-        customFrameOptionsValue: "SAMEORIGIN"
-        sslredirect: true
-        accesscontrolmaxage: 100
-        addVaryHeader: true
-        accesscontrolallowmethods: "GET,OPTIONS,PUT"
-        forcestsheader: true
-        customresponseheaders:
-          X-Robots-Tag: "none,noarchive,nosnippet,notranslate,noimageindex"
+        # contentTypeNosniff: true
+        # frameDeny: true
+        # sslRedirect: true
+        # stsIncludeSubdomains: true
+        # stsPreload: true
+        # stsSeconds: 31536000
+        # customFrameOptionsValue: "SAMEORIGIN"
+        # sslredirect: true
+        # accesscontrolmaxage: 100
+        # addVaryHeader: true
+        # accesscontrolallowmethods: "GET,OPTIONS,PUT"
+        # forcestsheader: true
+        # customresponseheaders:
+        #   X-Robots-Tag: "none,noarchive,nosnippet,notranslate,noimageindex"
 
-    authelia:
-      forwardauth:
-        address: http://authelia:9091/api/verify?rd=https://auth.{{ DOMAINNAME }}
+    fdwauth:
+      forwardAuth:
+        address: http://traefik-forward-auth:4181/auth
         trustForwardHeader: true
-        authResponseHeaders: Remote-User, Remote-Groups
+        authResponseHeaders:
+          - X-Forwarded-User
+          - X-WebAuth-User
 
 tls:
   options:

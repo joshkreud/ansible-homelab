@@ -1,11 +1,12 @@
 DOMAINNAME: localhost
-CERT_MAIL: "admin@{{ DOMAINNAME }}"
-edgerouter_volume_path: /opt/edgerouter/volumes
+CERT_MAIL: "admin@dev.local"
 prune_docker: no
 TIME_ZONE: Europe/Berlin
 EDGE_Network_Name: "edge"
 
-gateway_authelia_redis_pw: "veryrandomsecret" #! Password
-gateway_authelia_session_token: "veryrandomsecret" #! Password
-gateway_authelia_jwt_token: "veryrandomsecret" #! Password
-auehtlia_postgres_pw: "superduperrandom" #! Password
+keycloak_postgres_pw: "superduperrandom" #! Password
+keycloak_postgres_user: "keycloak"
+keycloak_postgres_db: 'keycloakdb'
+
+keycloak_user: "sysop"
+keycloak_password: 'admin' #! Password

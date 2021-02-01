@@ -1,0 +1,31 @@
+---
+- name: ensure dnsmasq installed
+  apt:
+    pkg:
+      - dnsmasq
+
+- name: Disable Systemd resolve
+  ansible.builtin.lineinfile:
+    path: /etc/systemd/resolved.conf
+    line: DNSStubListener=no
+    create: yes
+  notify: restart systemd-resolved
+
+- name: Flush handlers
+  meta: flush_handlers
+
+# - name: add local nameserver to resolvconf
+#   ansible.builtin.lineinfile:
+#     path: /etc/resolv.conf
+#     regexp: '^nameserver '
+#     line: nameserver 127.0.0.1
+
+- name: set OpenDNS upstream for dnsmasq
+  ansible.builtin.lineinfile:
+    path: /etc/dnsmasq.conf
+    regexp: '^server= '
+    line: server=208.67.222.222
+  notify: restart dnsmasq
+
+- name: Flush handlers
+  meta: flush_handlers

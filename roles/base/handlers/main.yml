@@ -1,0 +1,14 @@
+---
+- name: restart dnsmasq
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: restarted
+  with_items:
+    - dnsmasq
+
+- name: restart systemd-resolved
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: restarted
+  with_items:
+    - systemd-resolved

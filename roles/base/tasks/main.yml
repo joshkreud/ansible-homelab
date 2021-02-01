@@ -3,14 +3,22 @@
   community.general.timezone:
     name: "{{ TIME_ZONE }}"
 
-- name: Update apt cache & Install Tools
+- name: Update all packages to their latest version
   apt:
+    name: "*"
     update_cache: yes
     cache_valid_time: 600
+    state: latest
+
+- name: Install Apt Packages
+  apt:
     pkg:
       - jq
       - net-tools
-  when: ansible_os_family == 'Debian'
+
+- name: Install dnsmasq
+  include_tasks: dnsmasq.yml
+  when: hostname_loopback
 
 - name: ensure Pip Packages installed
   import_role:
@@ -28,13 +36,19 @@
   vars:
     docker_install_compose: no #causes timeout in gerlingguy rol
 
-- name: Ensure Docker Runs in Swarm mode # To be able to use Docker secrets
-  community.general.docker_swarm:
-    state: present
-
 - name: add a vm.overcommit_memory setting at the end of the sysctl.conf
   sysctl: name=vm.overcommit_memory value=1 state=present reload=yes
+
+- name: Ensure Domainname Loopback in in dnsmasq
+  ansible.builtin.lineinfile:
+    path: /etc/dnsmasq.d/dnsmasq-localLoopback.conf
+    line: "address=/{{ DOMAINNAME }}/127.0.0.1"
+    create: yes
+  notify: restart dnsmasq
 
 - name: Prune Docker
   include_tasks: docker_cleanup.yml
   when: prune_docker
+
+- name: Flush handlers
+  meta: flush_handlers

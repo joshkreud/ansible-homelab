@@ -1,103 +1,110 @@
 version: "3.9"
 
 secrets:
-  authelia_redis_password:
-    external: true
-  authelia_jwt:
-    external: true
-  authelia_session:
-    external: true
-  auehtlia_postgres_pw:
-    external: true
+  keycloak_postgres_pw:
+    file: "{{ stack_folder }}/secrets/keycloak_postgres_pw"
+  keycloak_password:
+    file: "{{ stack_folder }}/secrets/keycloak_password"
+  keycloak_user:
+    file: "{{ stack_folder }}/secrets/keycloak_user"
 
 services:
 
-  authelia:
-    image: authelia/authelia
-    secrets:
-      - authelia_jwt
-      - authelia_session
-      - authelia_redis_password
-      - auehtlia_postgres_pw
-    volumes:
-      - {{ edgerouter_volume_path }}/authelia/config:/config
-    networks:
-      - traefik_int
-    environment:
-      - AUTHELIA_JWT_SECRET_FILE=/run/secrets/authelia_jwt
-      - AUTHELIA_SESSION_SECRET_FILE=/run/secrets/authelia_session
-      - AUTHELIA_SESSION_REDIS_PASSWORD_FILE=/run/secrets/authelia_redis_password
-      - AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE=/run/secrets/auehtlia_postgres_pw
-      - "TZ={{ TIME_ZONE }}"
-    deploy:
-      update_config:
-        parallelism: 1
-        max_failure_ratio: 0
-        failure_action: rollback
-      labels:
-        - traefik.enable=true
-        - traefik.http.routers.authelia.rule=Host(`auth.{{ DOMAINNAME }}`)
-        - traefik.http.routers.authelia.entrypoints=websecure
-        - traefik.http.routers.authelia.tls=true
-        - traefik.http.routers.authelia.tls.certresolver=myresolver
-        - traefik.http.routers.authelia.middlewares=secheader@file
-        - traefik.http.services.authelia.loadbalancer.server.port=9091 #9091
-        - "traefik.docker.network={{ stack_name }}_traefik_int"
-
-  authelia_postgres:
+  keycloak-db:
     image: postgres
+    networks:
+      - keycloak_int
+    restart: unless-stopped
+    volumes:
+      - {{ stack_volume_folder }}/postgres/data/:/var/lib/postgresql/data
+    # ports:
+    #   - 5432:5432
     secrets:
-      - auehtlia_postgres_pw
+      - keycloak_postgres_pw
+    environment:
+      - POSTGRES_DB={{ keycloak_postgres_db }}
+      - POSTGRES_USER={{ keycloak_postgres_user }}
+      - POSTGRES_PASSWORD_FILE=/run/secrets/keycloak_postgres_pw
+    command: ["postgres", "-c", "log_min_messages=INFO"]
+
+  keycloak:
+    image: jboss/keycloak
+    restart: unless-stopped
+    depends_on:
+      - keycloak-db
     networks:
       - traefik_int
-    volumes:
-      - {{ edgerouter_volume_path }}/postgres/data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_PASSWORD_FILE=/run/secrets/auehtlia_postgres_pw
-      - POSTGRES_USER=authelia
-      - "TZ={{ TIME_ZONE }}"
-    deploy:
-      update_config:
-        parallelism: 1
-        max_failure_ratio: 0
-        failure_action: rollback
-
-
-  authelia_redis:
-    image: "redis:alpine"
+      - keycloak_int
+    # volumes:
+#     - {{ stack_volume_folder }}/keycloak/config.json:/config.json
     secrets:
-      - authelia_redis_password
-    volumes:
-      - {{ edgerouter_volume_path }}/redis/data:/redis_data
-      - {{ edgerouter_volume_path }}/redis/redis.conf:/usr/local/etc/redis/redis.conf
-    command:
-      [
-        "sh",
-        "-c",
-        'redis-server /usr/local/etc/redis/redis.conf --appendonly yes --requirepass "$$(cat /run/secrets/authelia_redis_password)"',
-      ]
+      - keycloak_password
+      - keycloak_postgres_pw
+      - keycloak_user
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - KEYCLOAK_LOGLEVEL=INFO
+      - KEYCLOAK_USER_FILE=/run/secrets/keycloak_user
+      - KEYCLOAK_PASSWORD_FILE=/run/secrets/keycloak_password
+#     - KEYCLOAK_IMPORT=/config.json
+      - DB_VENDOR=postgres
+      - DB_DATABASE={{ keycloak_postgres_db }}
+      - DB_ADDR=keycloak-db
+      - DB_USER={{ keycloak_postgres_user }}
+      - DB_PASSWORD_FILE=/run/secrets/keycloak_postgres_pw
+      - PROXY_ADDRESS_FORWARDING=true # This is required to run  behind traefik
+      - KEYCLOAK_HOSTNAME=keycloak.{{ DOMAINNAME }}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network={{ stack_name }}_traefik_int"
+      - "traefik.http.routers.keycloak.rule=Host(`keycloak.{{ DOMAINNAME }}`)"
+      - "traefik.http.routers.keycloak.entrypoints=websecure"
+      - "traefik.http.routers.keycloak.tls=true"
+      # - "traefik.http.routers.keycloak.tls.certresolver=myresolver"
+      - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
+
+  traefik-forward-auth:
+    image: thomseddon/traefik-forward-auth
     networks:
       - traefik_int
+      - keycloak_int
+    depends_on:
+      - keycloak
+    ports:
+      - 4181:4181
+    restart: unless-stopped
     environment:
-      - REDIS_REPLICATION_MODE=master
-      - "TZ={{ TIME_ZONE }}"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      - DEFAULT_PROVIDER=oidc
+      - DEFAULT_ACTION=auth
+      - PROVIDERS_OIDC_ISSUER_URL=https://keycloak.{{ DOMAINNAME }}/auth/realms/master
+      - PROVIDERS_OIDC_CLIENT_ID=traefik-forward-auth
+      - PROVIDERS_OIDC_CLIENT_SECRET=THISISASECRET
+      - SECRET=THISISASECRET #! Figure me out
+      - AUTH_HOST=auth.{{ DOMAINNAME }}
+      - URL_PATH=/_oauth
+      - COOKIE_DOMAIN={{ DOMAINNAME }}
+      - COOKIE_NAME={{ DOMAINNAME }}_forward_auth
+      - CSRF_COOKIE_NAME={{ DOMAINNAME }}_forward_auth_csrf
+      - LOG_LEVEL=debug
+      - LIFETIME=2592000
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_int"
+      - "traefik.http.routers.traefik-forward-auth.rule=Host(`auth.{{ DOMAINNAME }}`)"
+      - "traefik.http.routers.traefik-forward-auth.entrypoints=websecure"
+      - "traefik.http.routers.traefik-forward-auth.service=forward-auth-svc"
+      - "traefik.http.routers.traefik-forward-auth.tls=true"
+      # - "traefik.http.routers.traefik-forward-auth.tls.certresolver=myresolver"
+      # - "traefik.http.routers.traefik-forward-auth.middlewares=keycloak@file"
+      - "traefik.http.services.forward-auth-svc.loadbalancer.server.port=4181"
 
 
   dockerproxy_traefik:
     image: tecnativa/docker-socket-proxy
     networks:
       - traefik_sock
-    deploy:
-      update_config:
-        parallelism: 1
-        max_failure_ratio: 0
-        failure_action: rollback
-      placement:
-        constraints:
-          - node.role == manager
-
+    restart: unless-stopped
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     environment:
@@ -110,76 +117,95 @@ services:
 
   traefik:
     hostname: traefik
-    image: traefik:2.3
-    logging:
-      driver: json-file
-      options:
-        'max-size': '10m'
-        'max-file': '5'
+    image: traefik:2.2.1 #  https://github.com/traefik/traefik/issues/7020e
     volumes:
-      - "{{ edgerouter_volume_path }}/traefik/:/etc/traefik/"
+      - "{{ stack_volume_folder }}/traefik/:/etc/traefik/"
     ports:
       - "80:80"
       - "443:443"
+    depends_on:
+      - keycloak
+      - dockerproxy_traefik
+    restart: unless-stopped
     networks:
       - traefik_sock
       - traefik_int
       - {{ EDGE_Network_Name }}
     environment:
       - "TZ={{ TIME_ZONE }}"
-    deploy:
-      update_config:
-        parallelism: 1
-        max_failure_ratio: 0
-        failure_action: rollback
-      placement:
-        constraints:
-          - node.role == manager
-      labels:
-        - traefik.enable=true
-        # Traefik Dashboard
-        - traefik.http.routers.traefik-local.entrypoints=websecure
-        - traefik.http.routers.traefik-local.rule=Host(`traefik.{{ DOMAINNAME }}`)
-        - traefik.http.routers.traefik-local.service=api@internal
-        - traefik.http.routers.traefik-local.middlewares=authelia@file,secheader@file
-        - traefik.http.routers.traefik-local.tls=true
-        - traefik.docker.network={{ EDGE_Network_Name }}
-        - traefik.http.routers.traefik-local.tls.certresolver=myresolver
-        - traefik.http.services.traefik-local.loadbalancer.server.port=8080
-        - traefik.http.services.traefik-local.loadbalancer.server.scheme=http
+    command:
+      # Only for development environment
+      - --log.level=INFO
+      - "--api.dashboard=true"
+      - "--global.sendAnonymousUsage"
+      # Get Docker as the provider
+      - --providers.file.watch=true
+      - --providers.file.directory=/etc/traefik/config/
+      - --providers.docker=true
+      - --providers.docker.endpoint=tcp://dockerproxy_traefik:2375
+      - --providers.docker.network={{ EDGE_Network_Name }}
+      # Avoid that all containers are exposed
+      - --providers.docker.exposedbydefault=false
+      # Settle the ports for the entry points
+      - --entrypoints.web.address=:80
+      # Redirection
+      - --entrypoints.web.http.redirections.entryPoint.to=websecure
+      - --entrypoints.web.http.redirections.entryPoint.scheme=https
+      - --entrypoints.web.http.redirections.entrypoint.permanent=true
+      # HTTPS
+      - --entrypoints.websecure.address=:443
+      # HTTPS Certs
+      - --certificatesresolvers.myresolver.acme.httpchallenge=true
+      - --certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.myresolver.acme.email={{ CERT_MAIL }}
+      - --certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+      - --certificatesresolvers.myresolver.acme.storage=/etc/traefik/acme/acme.json
+      - --certificatesResolvers.myresolver.acme.tlsChallenge=true
+      # - --log.filePath=/var/log/traefik.log
+      - --accesslog=true
+      # - --accesslog.filepath=/var/log/accesslog.log
+      # - --accesslog.format=json
+      - --accesslog.filters.statuscodes=300-302,404,502,500
+      - --accesslog.filters.retryattempts
+      - --accesslog.filters.minduration=10ms
+    labels:
+      - traefik.enable=true
+      # Traefik Dashboard
+      - traefik.http.routers.traefik-local.entrypoints=websecure
+      - traefik.http.routers.traefik-local.rule=Host(`traefik.{{ DOMAINNAME }}`)
+      - traefik.http.routers.traefik-local.service=api@internal
+      # - traefik.http.routers.traefik-local.middlewares=fdwauth@file,secheader@file
+      - traefik.http.routers.traefik-local.tls=true
+      # - traefik.http.routers.traefik-local.tls.certresolver=myresolver
+      - traefik.http.services.traefik-local.loadbalancer.server.port=8080
+      - traefik.http.services.traefik-local.loadbalancer.server.scheme=http
 
 
   public:
     image: traefik/whoami
     networks:
       - {{ EDGE_Network_Name }}
+    restart: unless-stopped
     environment:
       - "TZ={{ TIME_ZONE }}"
-    deploy:
-      update_config:
-        parallelism: 1
-        max_failure_ratio: 0
-        failure_action: rollback
-      labels:
-        - traefik.enable=true
-        - traefik.http.routers.public.rule=Host(`public.{{ DOMAINNAME }}`)
-        - traefik.http.routers.public.entrypoints=websecure
-        - traefik.http.services.public.loadbalancer.server.port=80
-        - traefik.http.routers.public.tls=true
-        - traefik.http.routers.public.tls.certresolver=myresolver
-        - traefik.http.routers.public.middlewares=authelia@file,secheader@file
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.public.rule=Host(`public.{{ DOMAINNAME }}`)
+      - traefik.http.routers.public.entrypoints=websecure
+      - traefik.http.services.public.loadbalancer.server.port=80
+      - traefik.http.routers.public.tls=true
+      # - traefik.http.routers.public.tls.certresolver=myresolver
+      - traefik.http.routers.public.middlewares=fdwauth@file,secheader@file
 
 networks:
   traefik_sock:
-    driver: overlay
-    attachable: false
-    driver_opts:
-      encrypted: "true"
+    driver: bridge
   {{ EDGE_Network_Name }}:
     external: true
     name: {{ EDGE_Network_Name }}
   traefik_int:
-    driver: overlay
+    driver: bridge
     attachable: false
-    driver_opts:
-      encrypted: "true"
+  keycloak_int:
+    driver: bridge
+

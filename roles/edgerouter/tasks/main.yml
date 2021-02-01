@@ -1,3 +1,6 @@
 ---
 - name: Provision Traefik Router
   include_tasks: edge_stack.yml
+
+- name: Flush handlers
+  meta: flush_handlers
