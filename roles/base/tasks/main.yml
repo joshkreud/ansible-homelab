@@ -37,7 +37,11 @@
     docker_install_compose: no #causes timeout in gerlingguy rol
 
 - name: add a vm.overcommit_memory setting at the end of the sysctl.conf
-  sysctl: name=vm.overcommit_memory value=1 state=present reload=yes
+  sysctl:
+    name: vm.overcommit_memory
+    value: "1"
+    state: present
+    reload: yes
 
 - name: Ensure Domainname Loopback in in dnsmasq
   ansible.builtin.lineinfile:
