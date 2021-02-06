@@ -28,7 +28,7 @@ services:
     command: ["postgres", "-c", "log_min_messages=INFO"]
 
   keycloak:
-    image: jboss/keycloak
+    image: quay.io/keycloak/keycloak
     restart: unless-stopped
     depends_on:
       - keycloak-db

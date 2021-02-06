@@ -34,16 +34,16 @@
   import_role:
     name: geerlingguy.docker
   vars:
-    docker_install_compose: no #causes timeout in gerlingguy rol
+    docker_install_compose: no #causes timeout in gerlingguy role
 
-- name: add a vm.overcommit_memory setting at the end of the sysctl.conf
+- name: add a vm.overcommit_memory setting at the end of the sysctl.conf #For Redis
   sysctl:
     name: vm.overcommit_memory
     value: "1"
     state: present
     reload: yes
 
-- name: Ensure Domainname Loopback in in dnsmasq
+- name: Ensure Domainname Loopback in in dnsmasq # Possibly for Keycloak in Testing
   ansible.builtin.lineinfile:
     path: /etc/dnsmasq.d/dnsmasq-localLoopback.conf
     line: "address=/{{ DOMAINNAME }}/127.0.0.1"
